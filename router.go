@@ -275,10 +275,10 @@ func (app *App) customRequestHandler(rctx *fasthttp.RequestCtx) {
 
 func (app *App) addPrefixToRoute(prefix string, route *Route) *Route {
 	prefixedPath := getGroupPath(prefix, route.Path)
-	prettyPath := prefixedPath
+	prettyPath := []byte(prefixedPath)
 	// Case-sensitive routing, all to lowercase
 	if !app.config.CaseSensitive {
-		prettyPath = utils.ToLower(prettyPath)
+		prettyPath = utils.ToLowerBytes(prettyPath)
 	}
 	// Strict routing, remove trailing slashes
 	if !app.config.StrictRouting && len(prettyPath) > 1 {
@@ -286,8 +286,8 @@ func (app *App) addPrefixToRoute(prefix string, route *Route) *Route {
 	}
 
 	route.Path = prefixedPath
-	route.path = RemoveEscapeChar(prettyPath)
-	route.routeParser = parseRoute(prettyPath, app.customConstraints...)
+	route.path = RemoveEscapeChar(string(prettyPath))
+	route.routeParser = parseRoute(utils.UnsafeString(prettyPath), app.customConstraints...)
 	route.root = false
 	route.star = false
 
@@ -337,17 +337,17 @@ func (app *App) register(methods []string, pathRaw string, group *Group, handler
 	if pathRaw[0] != '/' {
 		pathRaw = "/" + pathRaw
 	}
-	pathPretty := pathRaw
+	pathPretty := []byte(pathRaw)
 	if !app.config.CaseSensitive {
-		pathPretty = utils.ToLower(pathPretty)
+		utils.ToLowerBytes(pathPretty)
 	}
 	if !app.config.StrictRouting && len(pathPretty) > 1 {
 		pathPretty = utils.TrimRight(pathPretty, '/')
 	}
-	pathClean := RemoveEscapeChar(pathPretty)
+	pathClean := removeEscapeChar(pathPretty)
 
 	parsedRaw := parseRoute(pathRaw, app.customConstraints...)
-	parsedPretty := parseRoute(pathPretty, app.customConstraints...)
+	parsedPretty := parseRoute(utils.UnsafeString(pathPretty), app.customConstraints...)
 
 	isMount := group != nil && group.app != app
 
@@ -358,8 +358,8 @@ func (app *App) register(methods []string, pathRaw string, group *Group, handler
 		}
 
 		isUse := method == methodUse
-		isStar := pathClean == "/*"
-		isRoot := pathClean == "/"
+		isStar := string(pathClean) == "/*"
+		isRoot := string(pathClean) == "/"
 
 		route := Route{
 			use:   isUse,
@@ -367,7 +367,7 @@ func (app *App) register(methods []string, pathRaw string, group *Group, handler
 			star:  isStar,
 			root:  isRoot,
 
-			path:        pathClean,
+			path:        string(pathClean),
 			routeParser: parsedPretty,
 			Params:      parsedRaw.params,
 			group:       group,
